@@ -1040,20 +1040,14 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: a
     <div className="space-y-6">
       {pages.map((pageData, pageIndex) => (
         <div key={pageIndex} className="game-page print:break-after-page min-h-[180mm] flex flex-col p-[15mm]">
-          <div className="mb-8 flex justify-between items-end border-b-2 border-slate-100 pb-4">
-            <div>
-              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Domino Tam Giác</h2>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
-                {mode === 'answer' ? 'Phiên bản dành cho Giáo viên' : 'Phiên bản dành cho Học sinh'} - Trang {pageIndex + 1}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-[12px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
-              <div className="text-[10px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
+          <div className="mb-2 flex justify-end border-b border-slate-100 pb-1">
+            <div className="text-right leading-tight">
+              <div className="text-[8px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
+              <div className="text-[7px] text-slate-400 italic">Trường THPT Nguyễn Hữu Cảnh</div>
             </div>
           </div>
           
-          <div className="flex flex-col gap-12 pt-8">
+          <div className="flex flex-col gap-12 pt-4">
             {[0, 1].map(rowIndex => {
               const rowData = pageData.slice(rowIndex * 5, (rowIndex + 1) * 5);
               if (rowData.length === 0) return null;
