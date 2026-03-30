@@ -21,11 +21,21 @@ import {
   FileSpreadsheet, 
   Image as ImageIcon,
   ChevronRight,
-  Info
+  Info,
+  Presentation,
+  ChevronLeft,
+  Eye,
+  EyeOff,
+  Maximize2,
+  Minimize2,
+  Eraser
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
+import 'katex/dist/katex.min.css';
+import { InlineMath } from 'react-katex';
+import confetti from 'canvas-confetti';
 
 // Types
 type GameType = 'domino' | 'matching' | 'triangle';
@@ -36,7 +46,101 @@ interface GameData {
   a: string;
 }
 
-type View = 'creator' | 'prompt' | 'library' | 'guide';
+type View = 'creator' | 'prompt' | 'library' | 'guide' | 'presentation';
+
+const PuzzleAssembler = ({ image, duration = 10 }: { image: string, duration?: number }) => {
+  const [aspectRatio, setAspectRatio] = useState<number>(16 / 9);
+  const rows = 16;
+  const cols = 24;
+  const total = rows * cols;
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = image;
+    img.onload = () => {
+      if (img.width && img.height) {
+        setAspectRatio(img.width / img.height);
+      }
+    };
+  }, [image]);
+
+  const [order] = useState(() => {
+    const arr = Array.from({ length: total }, (_, i) => i);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
+
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div 
+        className="grid shadow-2xl border-4 border-white/10 overflow-hidden"
+        style={{ 
+          aspectRatio: `${aspectRatio}`,
+          width: aspectRatio > 1.5 ? '100%' : 'auto',
+          height: aspectRatio <= 1.5 ? '100%' : 'auto',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`
+        }}
+      >
+        {Array.from({ length: total }).map((_, i) => {
+          const r = Math.floor(i / cols);
+          const c = i % cols;
+          const delayIndex = order.indexOf(i);
+          // Stagger the start times so the last piece finishes its 1.5s animation at exactly 'duration'
+          const delay = (delayIndex / total) * (duration - 1.5); 
+
+          // Random starting positions for a "flying in" effect
+          const startX = (Math.random() - 0.5) * 1000;
+          const startY = (Math.random() - 0.5) * 1000;
+
+          return (
+            <motion.div
+              key={i}
+              initial={{ 
+                opacity: 0, 
+                scale: 0, 
+                x: startX, 
+                y: startY,
+                rotate: Math.random() * 90 - 45 
+              }}
+              animate={{ 
+                opacity: 1, 
+                scale: 1, 
+                x: 0, 
+                y: 0,
+                rotate: 0 
+              }}
+              transition={{ 
+                duration: 1.5, 
+                delay,
+                ease: [0.23, 1, 0.32, 1] // Custom cubic-bezier for smooth landing
+              }}
+              className="relative overflow-hidden"
+            >
+              <img 
+                src={image} 
+                className="absolute max-w-none" 
+                style={{
+                  width: `${cols * 100.1}%`, // Slight overlap to prevent gaps
+                  height: `${rows * 100.1}%`,
+                  left: `${-c * 100}%`,
+                  top: `${-r * 100}%`,
+                  objectFit: 'cover'
+                }}
+                referrerPolicy="no-referrer"
+              />
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   const [activeView, setActiveView] = useState<View>('creator');
@@ -46,6 +150,10 @@ export default function App() {
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'student' | 'answer'>('answer');
   const [triangleFontSize, setTriangleFontSize] = useState<number>(16);
+  const [isPuzzleMode, setIsPuzzleMode] = useState<boolean>(false);
+  const [currentPresIdx, setCurrentPresIdx] = useState(0);
+  const [showPresAnswer, setShowPresAnswer] = useState(false);
+  const [isBlackboardFullscreen, setIsBlackboardFullscreen] = useState(false);
   
   // AI Prompt State
   const [promptInfo, setPromptInfo] = useState({
@@ -62,9 +170,63 @@ export default function App() {
 
   const printRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeView !== 'presentation') return;
+      
+      const maxIdx = isPuzzleMode ? data.length : data.length - 1;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        if (currentPresIdx < maxIdx) {
+          setCurrentPresIdx(prev => prev + 1);
+          setShowPresAnswer(false);
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        if (currentPresIdx > 0) {
+          setCurrentPresIdx(prev => prev - 1);
+          setShowPresAnswer(false);
+        }
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        setShowPresAnswer(prev => !prev);
+      } else if (e.key.toLowerCase() === 'f') {
+        setIsBlackboardFullscreen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeView, currentPresIdx, data.length, isPuzzleMode]);
+
+  // Fireworks effect for puzzle completion
+  useEffect(() => {
+    if (isPuzzleMode && currentPresIdx === data.length && activeView === 'presentation') {
+      const duration = 5 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+      const interval: any = setInterval(() => {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        // since particles fall down, start a bit higher than random
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+      }, 250);
+
+      return () => clearInterval(interval);
+    }
+  }, [isPuzzleMode, currentPresIdx, data.length, activeView]);
+
   // Navigation Items
   const navItems = [
     { id: 'creator', label: 'Công cụ tạo game', icon: LayoutGrid },
+    { id: 'presentation', label: 'Trình chiếu', icon: Presentation },
     { id: 'prompt', label: 'AI Prompt', icon: Wand2 },
     { id: 'library', label: 'Thư viện ý tưởng', icon: Library },
     { id: 'guide', label: 'Hướng dẫn', icon: BookOpen },
@@ -141,15 +303,8 @@ export default function App() {
     XLSX.writeFile(wb, "EduGame_Template.xlsx");
   };
 
-  // MathJax re-render
-  useEffect(() => {
-    if ((window as any).MathJax) {
-      (window as any).MathJax.typesetPromise?.();
-    }
-  }, [data, activeView, previewMode, gameType]);
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className={`min-h-screen ${activeView === 'presentation' ? 'bg-slate-950' : 'bg-[#F8FAFC]'} text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900`}>
       <style>
         {`
           @media print {
@@ -173,7 +328,7 @@ export default function App() {
             .game-page {
               width: ${gameType === 'triangle' ? '297mm' : '210mm'} !important;
               height: ${gameType === 'triangle' ? '210mm' : '297mm'} !important;
-              padding: 15mm !important;
+              padding: ${gameType === 'triangle' ? '5mm' : '15mm'} !important;
               page-break-after: always !important;
               break-after: page !important;
               display: flex !important;
@@ -187,15 +342,15 @@ export default function App() {
         `}
       </style>
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3">
+      <nav className={`sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 ${activeView === 'presentation' ? 'hidden' : ''}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
               <LayoutGrid size={22} />
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tight text-slate-800 leading-none">EduGame <span className="text-indigo-600">Creator</span></h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Professional Edition</p>
+              <h1 className="text-lg font-black tracking-tight text-slate-800 leading-none">Công Cụ Tạo <span className="text-indigo-600">Trò Chơi Giáo Dục</span></h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Tác giả: Vũ Tiến Lực - Trường THPT Nguyễn Hữu Cảnh</p>
             </div>
           </div>
           
@@ -278,19 +433,36 @@ export default function App() {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ảnh nền (Tùy chọn)</label>
-                      <div className="flex items-center gap-2">
-                        <label className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all group">
-                          <ImageIcon size={18} className="text-slate-400 group-hover:text-indigo-500" />
-                          <span className="text-sm text-slate-500 group-hover:text-indigo-600 font-medium">Tải ảnh lên</span>
-                          <input type="file" className="hidden" accept="image/*" onChange={handleBgUpload} />
-                        </label>
-                        {bgImage && (
-                          <button 
-                            onClick={() => setBgImage(null)}
-                            className="p-3 text-red-500 hover:bg-red-50 rounded-2xl border border-red-100 transition-all"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                          <label className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all group">
+                            <ImageIcon size={18} className="text-slate-400 group-hover:text-indigo-500" />
+                            <span className="text-sm text-slate-500 group-hover:text-indigo-600 font-medium">Tải ảnh lên</span>
+                            <input type="file" className="hidden" accept="image/*" onChange={handleBgUpload} />
+                          </label>
+                          {bgImage && (
+                            <button 
+                              onClick={() => setBgImage(null)}
+                              className="p-3 text-red-500 hover:bg-red-50 rounded-2xl border border-red-100 transition-all"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </div>
+
+                        {gameType === 'domino' && bgImage && (
+                          <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-2xl border border-indigo-100">
+                            <div>
+                              <label className="block text-xs font-black text-indigo-900 uppercase tracking-wider leading-none">Chế độ Nâng cao</label>
+                              <p className="text-[9px] text-indigo-600 font-medium mt-1">Ghép thẻ thành bức tranh hoàn chỉnh</p>
+                            </div>
+                            <button 
+                              onClick={() => setIsPuzzleMode(!isPuzzleMode)}
+                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none ${isPuzzleMode ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                            >
+                              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isPuzzleMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -454,6 +626,7 @@ export default function App() {
                       bgImage={bgImage} 
                       theme={dominoTheme} 
                       triangleFontSize={triangleFontSize}
+                      isPuzzleMode={isPuzzleMode}
                     />
                   </div>
                 </div>
@@ -666,7 +839,161 @@ export default function App() {
                     <div className="text-slate-500 text-xs mt-1 italic">Mức độ: Tổng hợp / Nâng cao</div>
                   </div>
                 </div>
+
+                <div className="mt-6 p-4 bg-indigo-600 rounded-2xl text-white flex items-center gap-4 shadow-lg shadow-indigo-200">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <ImageIcon size={24} />
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-tight text-lg leading-none">Mẹo cho Chế độ Nâng cao (Puzzle)</p>
+                    <p className="text-sm opacity-90 mt-1">Sử dụng đúng <strong>12 câu hỏi</strong> để các thẻ ghép lại thành một bức tranh A4 hoàn chỉnh (2 cột x 6 hàng).</p>
+                  </div>
+                </div>
               </section>
+            </motion.div>
+          )}
+
+          {activeView === 'presentation' && (
+            <motion.div
+              key="presentation"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 z-[100] bg-black p-0 flex flex-col overflow-hidden"
+            >
+              {/* Subtle Exit Button - visible on hover or at corner */}
+              <div className="absolute top-4 right-4 z-[110] opacity-0 hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => setActiveView('creator')}
+                  className="p-2 bg-white/10 text-white/50 hover:text-white hover:bg-white/20 rounded-full transition-all"
+                  title="Thoát trình chiếu"
+                >
+                  <EyeOff size={20} />
+                </button>
+              </div>
+
+              {data.length > 0 && (data[0].q || data[0].a) ? (
+                <>
+                  {/* Top: Question & Answer */}
+                  {!isBlackboardFullscreen && (
+                    <div className="flex-1 bg-black p-10 flex flex-col items-center justify-center relative overflow-hidden">
+                      <div className="absolute top-4 left-6 opacity-30">
+                        <div className="text-white/50 font-black text-xs uppercase tracking-widest">
+                          {isPuzzleMode && currentPresIdx === data.length ? 'Kết quả cuối cùng' : `Câu hỏi ${currentPresIdx + 1} / ${data.filter(d => d.q || d.a).length}`}
+                        </div>
+                      </div>
+
+                      <div className={`w-full ${isPuzzleMode && currentPresIdx === data.length ? 'h-full flex items-center justify-center' : 'max-w-5xl space-y-12'} text-center`}>
+                        {isPuzzleMode && currentPresIdx === data.length ? (
+                          <div className="w-full h-full flex items-center justify-center p-4">
+                            {bgImage ? (
+                              <div className="w-full h-full max-w-6xl max-h-[80vh] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20">
+                                <PuzzleAssembler image={bgImage} duration={10} />
+                              </div>
+                            ) : (
+                              <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 2 }}
+                                className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white rounded-3xl p-20"
+                              >
+                                <Trophy size={120} className="mb-8 text-yellow-400" />
+                                <h2 className="text-6xl font-black tracking-tighter uppercase">CHÚC MỪNG!</h2>
+                                <p className="text-xl mt-4 opacity-70 font-medium">Bạn đã hoàn thành trò chơi xuất sắc</p>
+                              </motion.div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <div className="space-y-4">
+                              <h2 className="text-4xl md:text-7xl font-black leading-tight text-white drop-shadow-lg">
+                                <MathText text={data[currentPresIdx].q || "Chưa có nội dung"} />
+                              </h2>
+                            </div>
+
+                            <AnimatePresence mode="wait">
+                              {showPresAnswer ? (
+                                <motion.div
+                                  key="answer"
+                                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                                  className="p-8 bg-emerald-900/30 border-2 border-emerald-500/30 rounded-3xl shadow-inner relative group"
+                                >
+                                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full">Đáp án đúng</div>
+                                  <p className="text-3xl md:text-5xl font-black text-emerald-400">
+                                    <MathText text={data[currentPresIdx].a || "Chưa có đáp án"} />
+                                  </p>
+                                </motion.div>
+                              ) : (
+                                <motion.button
+                                  key="reveal"
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => setShowPresAnswer(true)}
+                                  className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl uppercase tracking-widest shadow-2xl flex items-center gap-4 mx-auto group"
+                                >
+                                  <Eye className="group-hover:text-white transition-colors" />
+                                  Hiện đáp án
+                                </motion.button>
+                              )}
+                            </AnimatePresence>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Navigation Controls - Subtle */}
+                      <div className="absolute bottom-4 right-6 flex gap-2 opacity-0 hover:opacity-100 transition-opacity">
+                        <button 
+                          disabled={currentPresIdx === 0}
+                          onClick={() => { setCurrentPresIdx(prev => prev - 1); setShowPresAnswer(false); }}
+                          className="p-3 rounded-xl transition-all bg-white/5 text-white/30 hover:bg-white/10 hover:text-white disabled:opacity-10"
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+                        <button 
+                          disabled={currentPresIdx === (isPuzzleMode ? data.length : data.length - 1)}
+                          onClick={() => { setCurrentPresIdx(prev => prev + 1); setShowPresAnswer(false); }}
+                          className="p-3 rounded-xl transition-all bg-white/5 text-white/30 hover:bg-white/10 hover:text-white disabled:opacity-10"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bottom: Blackboard */}
+                  {!(isPuzzleMode && currentPresIdx === data.length) && (
+                    <div className="flex-1 bg-black border-t border-white/10 relative overflow-hidden group transition-all duration-500">
+                      <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/chalkboard.png')]"></div>
+                      <div className="relative z-10 flex flex-col h-full">
+                        <div className="flex items-center justify-between px-4 py-2 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-2 text-white/30">
+                            <span className="text-[9px] font-black uppercase tracking-[0.3em]">Bảng viết tay (F: Toàn màn hình)</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setIsBlackboardFullscreen(!isBlackboardFullscreen)}
+                              className="p-1.5 text-white/30 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                              title={isBlackboardFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
+                            >
+                              {isBlackboardFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex-1 relative">
+                          <Blackboard />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex-1 bg-slate-900 rounded-3xl border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600">
+                  <Presentation size={64} strokeWidth={1} className="mb-4 opacity-20" />
+                  <p className="text-lg font-bold">Chưa có dữ liệu để trình chiếu</p>
+                  <p className="text-sm">Vui lòng nhập câu hỏi ở phần "Công cụ tạo game"</p>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -758,22 +1085,22 @@ export default function App() {
                         <tr>
                           <td className="px-4 py-2">Phân số</td>
                           <td className="px-4 py-2"><code>{'\\frac{1}{2}'}</code></td>
-                          <td className="px-4 py-2">{'$\\frac{1}{2}$'}</td>
+                          <td className="px-4 py-2"><MathText text={'$\\frac{1}{2}$'} /></td>
                         </tr>
                         <tr>
                           <td className="px-4 py-2">Số mũ</td>
                           <td className="px-4 py-2"><code>{'x^2'}</code></td>
-                          <td className="px-4 py-2">{'$x^2$'}</td>
+                          <td className="px-4 py-2"><MathText text={'$x^2$'} /></td>
                         </tr>
                         <tr>
                           <td className="px-4 py-2">Căn bậc hai</td>
                           <td className="px-4 py-2"><code>{'\\sqrt{x}'}</code></td>
-                          <td className="px-4 py-2">{'$\\sqrt{x}$'}</td>
+                          <td className="px-4 py-2"><MathText text={'$\\sqrt{x}$'} /></td>
                         </tr>
                         <tr>
                           <td className="px-4 py-2">Nhân/Chia</td>
                           <td className="px-4 py-2"><code>{'\\times, \\div'}</code></td>
-                          <td className="px-4 py-2">{'$\\times, \\div$'}</td>
+                          <td className="px-4 py-2"><MathText text={'$\\times, \\div$'} /></td>
                         </tr>
                       </tbody>
                     </table>
@@ -798,7 +1125,7 @@ export default function App() {
       {/* Footer */}
       <footer className="mt-12 py-8 border-t border-slate-200 bg-white">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-slate-400 text-sm">© 2026 EduGame Creator. Thiết kế cho giáo dục hiện đại.</p>
+          <p className="text-slate-400 text-sm">© 2026 Công Cụ Tạo Trò Chơi Giáo Dục. Tác giả: Vũ Tiến Lực - Trường THPT Nguyễn Hữu Cảnh.</p>
         </div>
       </footer>
     </div>
@@ -902,7 +1229,160 @@ const AutoFitText = ({ text, className = "", maxFontSize = 12 }: { text: string,
 
   return (
     <div ref={containerRef} className={`w-full h-full flex items-center justify-center p-1 text-center overflow-hidden ${className}`}>
-      <span className="game-content-text leading-tight">{text}</span>
+      <span className="game-content-text leading-tight">
+        <MathText text={text} />
+      </span>
+    </div>
+  );
+};
+
+/**
+ * MathText Component for LaTeX rendering
+ */
+const MathText = ({ text }: { text: string }) => {
+  if (!text) return null;
+  
+  // Split text by $ delimiters
+  const parts = text.split(/(\$.*?\$)/g);
+  
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('$') && part.endsWith('$')) {
+          const math = part.slice(1, -1);
+          return <InlineMath key={i} math={math} />;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+};
+
+/**
+ * Blackboard Component for drawing
+ */
+const Blackboard = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [color, setColor] = useState('#ffffff');
+  const [lineWidth, setLineWidth] = useState(3);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Resize canvas to fit container
+    const resize = () => {
+      window.requestAnimationFrame(() => {
+        const parent = canvas.parentElement;
+        if (parent && canvas) {
+          // Save current content
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          const tempCtx = tempCanvas.getContext('2d');
+          if (tempCtx) tempCtx.drawImage(canvas, 0, 0);
+
+          canvas.width = parent.clientWidth;
+          canvas.height = parent.clientHeight;
+
+          // Restore content
+          const currentCtx = canvas.getContext('2d');
+          if (currentCtx) {
+            currentCtx.drawImage(tempCanvas, 0, 0);
+            currentCtx.lineCap = 'round';
+            currentCtx.lineJoin = 'round';
+          }
+        }
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(resize);
+    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
+
+    resize();
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    setIsDrawing(true);
+    draw(e);
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) ctx.beginPath();
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+
+    if ('touches' in e) {
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = color;
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  return (
+    <div className="w-full h-full relative cursor-crosshair">
+      <canvas
+        ref={canvasRef}
+        onMouseDown={startDrawing}
+        onMouseUp={stopDrawing}
+        onMouseMove={draw}
+        onMouseOut={stopDrawing}
+        onTouchStart={startDrawing}
+        onTouchEnd={stopDrawing}
+        onTouchMove={draw}
+        className="w-full h-full block"
+      />
+      <div className="absolute bottom-4 right-4 flex gap-2 bg-slate-800/80 backdrop-blur-sm p-2 rounded-xl border border-slate-700 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-1 border-r border-slate-700 pr-2 mr-1">
+          {['#ffffff', '#f87171', '#4ade80', '#60a5fa', '#fbbf24'].map(c => (
+            <button
+              key={c}
+              onClick={() => setColor(c)}
+              className={`w-6 h-6 rounded-full border-2 ${color === c ? 'border-white scale-110' : 'border-transparent'}`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+        <button 
+          onClick={clear}
+          className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+          title="Xoá bảng"
+        >
+          <Eraser size={18} />
+        </button>
+      </div>
     </div>
   );
 };
@@ -910,7 +1390,7 @@ const AutoFitText = ({ text, className = "", maxFontSize = 12 }: { text: string,
 /**
  * Domino Component
  */
-const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any[], mode: string, cutLineClass: string, theme?: DominoTheme }) => {
+const DominoGame = ({ data, mode, cutLineClass, theme = 'classic', bgImage, isPuzzleMode }: { data: any[], mode: string, cutLineClass: string, theme?: DominoTheme, bgImage?: string | null, isPuzzleMode?: boolean }) => {
   const themeStyles = {
     classic: {
       card: "bg-white border-slate-900",
@@ -947,6 +1427,9 @@ const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any
     pages.push(data.slice(i, i + itemsPerPage));
   }
 
+  const columns = 2;
+  const rows = 6;
+
   return (
     <div className="space-y-10">
       {pages.map((pageData, pageIndex) => (
@@ -957,6 +1440,11 @@ const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
                 {mode === 'answer' ? 'Phiên bản dành cho Giáo viên' : 'Phiên bản dành cho Học sinh'} - Trang {pageIndex + 1}
               </p>
+              {isPuzzleMode && bgImage && (
+                <p className="text-[10px] text-indigo-500 font-bold mt-1 italic">
+                  * Gợi ý: Ghép đúng các thẻ để hoàn thiện bức tranh bí ẩn!
+                </p>
+              )}
             </div>
             <div className="text-right">
               <div className="text-[10px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
@@ -967,15 +1455,33 @@ const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any
           <div className="grid grid-cols-2 gap-x-8 gap-y-6 pt-4">
             {pageData.map((item, i) => {
               const globalIndex = pageIndex * itemsPerPage + i;
+              const puzzleIndex = item.originalIndex % itemsPerPage;
+              const rawRow = Math.floor(puzzleIndex / columns);
+              const isReversedRow = isPuzzleMode && (rawRow % 2 === 1);
+              
+              const col = isReversedRow ? (columns - 1 - (puzzleIndex % columns)) : (puzzleIndex % columns);
+              const row = rawRow;
+
+              const puzzleStyle = (isPuzzleMode && bgImage) ? {
+                backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url(${bgImage})`,
+                backgroundSize: `${columns * 100}% ${rows * 100}%`,
+                backgroundPosition: `${col * 100}% ${row * 20}%`,
+                backgroundRepeat: 'no-repeat'
+              } : {};
+
               return (
-                <div key={globalIndex} className={`flex border-[1.5pt] h-28 rounded-md overflow-hidden shadow-sm relative ${s.card} ${cutLineClass}`}>
+                <div 
+                  key={globalIndex} 
+                  style={puzzleStyle}
+                  className={`flex ${isReversedRow ? 'flex-row-reverse' : 'flex-row'} border-[1.5pt] h-28 rounded-md overflow-hidden shadow-sm relative ${s.card} ${cutLineClass}`}
+                >
                   {/* Scissor Icon for Print */}
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 hidden print:block text-[10px] text-slate-400">✂️</div>
                   
                   {/* Card Numbering */}
                   <div className={`absolute top-1 left-1 text-[8px] font-black uppercase ${s.number}`}>Thẻ #{globalIndex + 1}</div>
 
-                  <div className={`flex-1 flex items-center justify-center border-r-[1pt] relative ${s.left}`}>
+                  <div className={`flex-1 flex items-center justify-center ${isReversedRow ? 'border-l-[1pt]' : 'border-r-[1pt]'} relative ${s.left} ${isPuzzleMode && bgImage ? 'bg-transparent' : ''}`}>
                     {/* Start Indicator */}
                     {item.originalIndex === 0 && (
                       <div className="absolute top-1 right-1 bg-indigo-600 text-white p-1 rounded-full shadow-lg animate-bounce">
@@ -1000,7 +1506,7 @@ const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any
   );
 };
 
-function GameRenderer({ type, data, mode, bgImage, theme, triangleFontSize }: { type: GameType, data: GameData[], mode: 'student' | 'answer', bgImage: string | null, theme: DominoTheme, triangleFontSize?: number }) {
+function GameRenderer({ type, data, mode, bgImage, theme, triangleFontSize, isPuzzleMode }: { type: GameType, data: GameData[], mode: 'student' | 'answer', bgImage: string | null, theme: DominoTheme, triangleFontSize?: number, isPuzzleMode?: boolean }) {
   const shuffle = React.useCallback((array: any[]) => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -1039,7 +1545,7 @@ function GameRenderer({ type, data, mode, bgImage, theme, triangleFontSize }: { 
 
   if (type === 'matching') return <MatchingGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} />;
   if (type === 'triangle') return <TriangleGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} fontSize={triangleFontSize} />;
-  return <DominoGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} />;
+  return <DominoGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} bgImage={bgImage} isPuzzleMode={isPuzzleMode} />;
 }
 
 /**
@@ -1126,15 +1632,15 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic', fontSize = 
   return (
     <div className="space-y-6">
       {pages.map((pageData, pageIndex) => (
-        <div key={pageIndex} className="game-page print:break-after-page min-h-[180mm] flex flex-col p-[15mm]">
-          <div className="mb-2 flex justify-end border-b border-slate-100 pb-1">
+        <div key={pageIndex} className="game-page print:break-after-page min-h-[180mm] flex flex-col p-[5mm]">
+          <div className="mb-1 flex justify-end border-b border-slate-100 pb-1">
             <div className="text-right leading-tight">
               <div className="text-[8px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
               <div className="text-[7px] text-slate-400 italic">Trường THPT Nguyễn Hữu Cảnh</div>
             </div>
           </div>
           
-          <div className="flex flex-col gap-12 pt-10">
+          <div className="flex flex-col gap-2 pt-2">
             {[0, 1].map(rowIndex => {
               const rowData = pageData.slice(rowIndex * 4, (rowIndex + 1) * 4);
               if (rowData.length === 0) return null;
@@ -1148,7 +1654,7 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic', fontSize = 
                     return (
                       <div 
                         key={globalIndex} 
-                        className={`relative w-[40%] aspect-[1.15/1] ${i > 0 ? '-ml-[20%]' : ''} ${cutLineClass}`}
+                        className={`relative w-[36%] aspect-[1.15/1] ${i > 0 ? '-ml-[18%]' : ''} ${cutLineClass}`}
                       >
                         <svg viewBox="0 0 100 86.6" className="w-full h-full drop-shadow-sm">
                           <polygon 
