@@ -779,7 +779,7 @@ const exportToImage = async (element: HTMLElement, fileName: string) => {
 /**
  * Auto-fit text component to prevent overflow
  */
-const AutoFitText = ({ text, className = "" }: { text: string, className?: string }) => {
+const AutoFitText = ({ text, className = "", maxFontSize = 12 }: { text: string, className?: string, maxFontSize?: number }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -787,14 +787,14 @@ const AutoFitText = ({ text, className = "" }: { text: string, className?: strin
     const container = containerRef.current;
     
     // Reset to default
-    container.style.fontSize = '12px';
+    container.style.fontSize = `${maxFontSize}px`;
     
-    let currentSize = 12;
+    let currentSize = maxFontSize;
     // Heuristic for long text
-    if (text.length > 40) currentSize = 10;
-    if (text.length > 80) currentSize = 8;
-    if (text.length > 120) currentSize = 7;
-    if (text.length > 160) currentSize = 6;
+    if (text.length > 40) currentSize = Math.min(maxFontSize, 10);
+    if (text.length > 80) currentSize = Math.min(maxFontSize, 8);
+    if (text.length > 120) currentSize = Math.min(maxFontSize, 7);
+    if (text.length > 160) currentSize = Math.min(maxFontSize, 6);
     
     container.style.fontSize = `${currentSize}px`;
 
@@ -1029,8 +1029,8 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: a
   };
   const s = themeStyles[theme];
 
-  // Split data into pages (40 triangles per page for A4 landscape to maximize count)
-  const itemsPerPage = 40;
+  // Split data into pages (10 triangles per page as per example)
+  const itemsPerPage = 10;
   const pages = [];
   for (let i = 0; i < data.length; i += itemsPerPage) {
     pages.push(data.slice(i, i + itemsPerPage));
@@ -1040,87 +1040,103 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: a
     <div className="space-y-6">
       {pages.map((pageData, pageIndex) => (
         <div key={pageIndex} className="game-page print:break-after-page min-h-[180mm] flex flex-col p-[15mm]">
-          <div className="mb-4 flex justify-between items-end border-b-2 border-slate-100 pb-2">
+          <div className="mb-8 flex justify-between items-end border-b-2 border-slate-100 pb-4">
             <div>
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Domino Tam Giác</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Domino Tam Giác</h2>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
                 {mode === 'answer' ? 'Phiên bản dành cho Giáo viên' : 'Phiên bản dành cho Học sinh'} - Trang {pageIndex + 1}
               </p>
             </div>
             <div className="text-right">
-              <div className="text-[9px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
-              <div className="text-[7px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
+              <div className="text-[12px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
+              <div className="text-[10px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
             </div>
           </div>
           
-          <div className="flex flex-wrap pt-4 px-2 justify-center">
-            {pageData.map((item, i) => {
-              const globalIndex = pageIndex * itemsPerPage + i;
-              const isDown = globalIndex % 2 === 1;
-              const isStartOfRow = i % 10 === 0; // 10 triangles per row
+          <div className="flex flex-col gap-12 pt-8">
+            {[0, 1].map(rowIndex => {
+              const rowData = pageData.slice(rowIndex * 5, (rowIndex + 1) * 5);
+              if (rowData.length === 0) return null;
               
               return (
-                <div 
-                  key={globalIndex} 
-                  className={`relative w-[18%] aspect-[1.15/1] ${isStartOfRow ? '' : '-ml-[9%]'} ${cutLineClass} mb-2`}
-                >
-                  <svg viewBox="0 0 100 86.6" className="w-full h-full drop-shadow-sm">
-                    <polygon 
-                      points={isDown ? "0,0 100,0 50,86.6" : "50,0 0,86.6 100,86.6"} 
-                      fill={s.bg} 
-                      stroke={s.border} 
-                      strokeWidth="0.8"
-                    />
-                  </svg>
-                  
-                  {/* Content Overlay */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    {/* Start Indicator */}
-                    {item.originalIndex === 0 && (
-                      <div className={`absolute ${isDown ? 'bottom-3' : 'top-3'} left-1/2 -translate-x-1/2 bg-green-500 text-white text-[6px] px-1 rounded-full font-black z-10`}>START</div>
-                    )}
-
-                    {isDown ? (
-                      <>
-                        {/* Top-Left side (A) - Parallel to side */}
-                        <div className="absolute top-[12%] left-[10%] w-[42%] h-[15%] rotate-[60deg] text-center flex items-center justify-center">
-                          <AutoFitText 
-                            text={item.displayLeft} 
-                            className={`font-bold text-[8px] leading-[1.0] ${s.text}`} 
-                          />
-                        </div>
-                        {/* Top-Right side (Q) - Parallel to side */}
-                        <div className="absolute top-[12%] right-[10%] w-[42%] h-[15%] -rotate-[60deg] text-center flex items-center justify-center">
-                          <AutoFitText 
-                            text={item.displayRight} 
-                            className={`font-bold text-[8px] leading-[1.0] ${s.text}`} 
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Bottom-Left side (A) - Parallel to side */}
-                        <div className="absolute top-[45%] left-[10%] w-[42%] h-[15%] -rotate-[60deg] text-center flex items-center justify-center">
-                          <AutoFitText 
-                            text={item.displayLeft} 
-                            className={`font-bold text-[8px] leading-[1.0] ${s.text}`} 
-                          />
-                        </div>
-                        {/* Bottom-Right side (Q) - Parallel to side */}
-                        <div className="absolute top-[45%] right-[10%] w-[42%] h-[15%] rotate-[60deg] text-center flex items-center justify-center">
-                          <AutoFitText 
-                            text={item.displayRight} 
-                            className={`font-bold text-[8px] leading-[1.0] ${s.text}`} 
-                          />
-                        </div>
-                      </>
-                    )}
+                <div key={rowIndex} className="flex justify-center">
+                  {rowData.map((item, i) => {
+                    const globalIndex = pageIndex * itemsPerPage + rowIndex * 5 + i;
+                    const isDown = i % 2 === 1;
                     
-                    {/* ID */}
-                    <div className={`absolute ${isDown ? 'top-1' : 'bottom-1'} left-0 w-full text-center opacity-30 text-[6px] font-black`}>
-                      #{globalIndex + 1}
-                    </div>
-                  </div>
+                    return (
+                      <div 
+                        key={globalIndex} 
+                        className={`relative w-[32%] aspect-[1.15/1] ${i > 0 ? '-ml-[16%]' : ''} ${cutLineClass}`}
+                      >
+                        <svg viewBox="0 0 100 86.6" className="w-full h-full drop-shadow-sm">
+                          <polygon 
+                            points={isDown ? "0,0 100,0 50,86.6" : "50,0 0,86.6 100,86.6"} 
+                            fill={s.bg} 
+                            stroke={s.border} 
+                            strokeWidth="1.2"
+                          />
+                          {/* Dashed lines between triangles as seen in example */}
+                          {!isDown && i < rowData.length - 1 && (
+                            <line x1="100" y1="86.6" x2="100" y2="0" stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="2,2" />
+                          )}
+                        </svg>
+                        
+                        {/* Content Overlay */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          {/* Start Indicator */}
+                          {item.originalIndex === 0 && (
+                            <div className={`absolute ${isDown ? 'bottom-6' : 'top-6'} left-1/2 -translate-x-1/2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black z-10`}>START</div>
+                          )}
+
+                          {isDown ? (
+                            <>
+                              {/* Top-Left side (A) - Parallel to side */}
+                              <div className="absolute top-[18%] left-[15%] w-[35%] h-[25%] rotate-[60deg] text-center flex items-center justify-center">
+                                <AutoFitText 
+                                  text={item.displayLeft} 
+                                  maxFontSize={16}
+                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                />
+                              </div>
+                              {/* Top-Right side (Q) - Parallel to side */}
+                              <div className="absolute top-[18%] right-[15%] w-[35%] h-[25%] -rotate-[60deg] text-center flex items-center justify-center">
+                                <AutoFitText 
+                                  text={item.displayRight} 
+                                  maxFontSize={16}
+                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* Bottom-Left side (A) - Parallel to side */}
+                              <div className="absolute top-[42%] left-[15%] w-[35%] h-[25%] -rotate-[60deg] text-center flex items-center justify-center">
+                                <AutoFitText 
+                                  text={item.displayLeft} 
+                                  maxFontSize={16}
+                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                />
+                              </div>
+                              {/* Bottom-Right side (Q) - Parallel to side */}
+                              <div className="absolute top-[42%] right-[15%] w-[35%] h-[25%] rotate-[60deg] text-center flex items-center justify-center">
+                                <AutoFitText 
+                                  text={item.displayRight} 
+                                  maxFontSize={16}
+                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                />
+                              </div>
+                            </>
+                          )}
+                          
+                          {/* ID */}
+                          <div className={`absolute ${isDown ? 'top-2' : 'bottom-2'} left-0 w-full text-center opacity-30 text-[10px] font-black`}>
+                            #{globalIndex + 1}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
