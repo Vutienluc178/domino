@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@layer base {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+  }
+
+  /* MathJax Inline Fixes */
+  mjx-container {
+    display: inline-block !important;
+    vertical-align: middle !important;
+    margin: 0 0.2em !important;
+    line-height: 0;
+  }
+  
+  mjx-container[display="true"] {
+    display: inline-block !important;
+    text-align: center;
+    margin: 0.5em 0 !important;
+    width: 100%;
+  }
+
+  .game-content-text {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: normal;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #game-canvas, #game-canvas * {
+    visibility: visible;
+  }
+  #game-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 15mm;
+    box-shadow: none;
+    transform: scale(1) !important;
+    background: white !important;
+  }
+  
+  /* Force cut lines to be visible in print */
+  .print\:border-dashed {
+    border-style: dashed !important;
+    border-color: #94a3b8 !important; /* slate-400 */
+    border-width: 0.5pt !important;
+  }
+  
+  nav, footer, .lg\:col-span-4, .bg-white.p-5.rounded-3xl.shadow-sm.border.border-slate-200.flex.flex-wrap.items-center.justify-between.gap-4 {
+    display: none !important;
+  }
+
+  /* Ensure background colors print */
+  .bg-slate-50\/50 {
+    background-color: #f8fafc !important;
+    -webkit-print-color-adjust: exact;
+  }
+  .bg-indigo-600 {
+    background-color: #4f46e5 !important;
+    -webkit-print-color-adjust: exact;
+  }
+}
