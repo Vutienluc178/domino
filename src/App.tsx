@@ -115,7 +115,14 @@ export default function App() {
 
   const handleDownloadPNG = async () => {
     if (!printRef.current) return;
-    await exportToImage(printRef.current, `game-${gameType}-${Date.now()}`);
+    const pages = printRef.current.querySelectorAll('.game-page');
+    if (pages.length > 0) {
+      for (let i = 0; i < pages.length; i++) {
+        await exportToImage(pages[i] as HTMLElement, `game-${gameType}-page-${i + 1}-${Date.now()}`);
+      }
+    } else {
+      await exportToImage(printRef.current, `game-${gameType}-${Date.now()}`);
+    }
   };
 
   const handleDownloadTemplate = () => {
@@ -151,11 +158,21 @@ export default function App() {
             }
             #game-canvas {
               width: ${gameType === 'triangle' ? '297mm' : '210mm'} !important;
-              min-height: ${gameType === 'triangle' ? '210mm' : '297mm'} !important;
-              padding: 10mm !important;
+              padding: 0 !important;
               box-shadow: none !important;
               transform: none !important;
               margin: 0 !important;
+              background: white !important;
+            }
+            .game-page {
+              width: ${gameType === 'triangle' ? '297mm' : '210mm'} !important;
+              height: ${gameType === 'triangle' ? '210mm' : '297mm'} !important;
+              padding: 15mm !important;
+              page-break-after: always !important;
+              break-after: page !important;
+              display: flex !important;
+              flex-direction: column !important;
+              background: white !important;
             }
             .no-print {
               display: none !important;
@@ -398,37 +415,11 @@ export default function App() {
                 <div className="bg-slate-200 p-4 md:p-10 rounded-[2rem] overflow-x-auto min-h-[700px] flex justify-center shadow-inner">
                   <div 
                     ref={printRef}
-                    className={`bg-white shadow-2xl origin-top transform scale-[0.6] sm:scale-[0.8] md:scale-100 p-[15mm] ${
-                      gameType === 'triangle' ? 'w-[297mm] min-h-[210mm]' : 'w-[210mm] min-h-[297mm]'
+                    className={`bg-white shadow-2xl origin-top transform scale-[0.6] sm:scale-[0.8] md:scale-100 ${
+                      gameType === 'triangle' ? 'w-[297mm]' : 'w-[210mm]'
                     }`}
                     id="game-canvas"
                   >
-                    <div className="mb-10 flex justify-between items-end border-b-2 border-slate-100 pb-4">
-                      <div>
-                        <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">
-                          {gameType === 'domino' && 'Trò chơi Domino Tiếp Sức'}
-                          {gameType === 'matching' && 'Bộ Thẻ Ghép Cặp'}
-                          {gameType === 'triangle' && 'Domino Tam Giác'}
-                        </h2>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
-                          {previewMode === 'answer' ? 'Phiên bản dành cho Giáo viên' : 'Phiên bản dành cho Học sinh'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        {gameType === 'triangle' ? (
-                          <>
-                            <div className="text-[10px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
-                            <div className="text-[8px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest">EduGame Creator</div>
-                            <div className="text-[8px] text-slate-300 mt-1">Generated on {new Date().toLocaleDateString()}</div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    
                     <GameRenderer type={gameType} data={data} mode={previewMode} bgImage={bgImage} theme={dominoTheme} />
                   </div>
                 </div>
@@ -864,28 +855,57 @@ const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any
 
   const s = themeStyles[theme];
 
-  return (
-    <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-      {data.map((item, i) => (
-        <div key={i} className={`flex border-[1.5pt] h-28 rounded-md overflow-hidden shadow-sm relative ${s.card} ${cutLineClass}`}>
-          {/* Scissor Icon for Print */}
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 hidden print:block text-[10px] text-slate-400">✂️</div>
-          
-          {/* Card Numbering */}
-          <div className={`absolute top-1 left-1 text-[8px] font-black uppercase ${s.number}`}>Thẻ #{i + 1}</div>
+  // Split data into pages (12 dominoes per page for A4 portrait)
+  const itemsPerPage = 12;
+  const pages = [];
+  for (let i = 0; i < data.length; i += itemsPerPage) {
+    pages.push(data.slice(i, i + itemsPerPage));
+  }
 
-          <div className={`flex-1 flex items-center justify-center border-r-[1pt] relative ${s.left}`}>
-            {/* Start Indicator */}
-            {item.originalIndex === 0 && (
-              <div className="absolute top-1 right-1 bg-green-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">START</div>
-            )}
-            <AutoFitText 
-              text={item.displayLeft} 
-              className={`font-bold ${s.text}`}
-            />
+  return (
+    <div className="space-y-10">
+      {pages.map((pageData, pageIndex) => (
+        <div key={pageIndex} className="game-page print:break-after-page min-h-[270mm] flex flex-col p-[15mm]">
+          <div className="mb-6 flex justify-between items-end border-b-2 border-slate-100 pb-4">
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Domino Học Tập</h2>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                {mode === 'answer' ? 'Phiên bản dành cho Giáo viên' : 'Phiên bản dành cho Học sinh'} - Trang {pageIndex + 1}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
+              <div className="text-[8px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
+            </div>
           </div>
-          <div className="flex-1 flex items-center justify-center">
-            <AutoFitText text={item.displayRight} className={`font-bold ${s.text}`} />
+          
+          <div className="grid grid-cols-2 gap-x-8 gap-y-6 pt-4">
+            {pageData.map((item, i) => {
+              const globalIndex = pageIndex * itemsPerPage + i;
+              return (
+                <div key={globalIndex} className={`flex border-[1.5pt] h-28 rounded-md overflow-hidden shadow-sm relative ${s.card} ${cutLineClass}`}>
+                  {/* Scissor Icon for Print */}
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 hidden print:block text-[10px] text-slate-400">✂️</div>
+                  
+                  {/* Card Numbering */}
+                  <div className={`absolute top-1 left-1 text-[8px] font-black uppercase ${s.number}`}>Thẻ #{globalIndex + 1}</div>
+
+                  <div className={`flex-1 flex items-center justify-center border-r-[1pt] relative ${s.left}`}>
+                    {/* Start Indicator */}
+                    {item.originalIndex === 0 && (
+                      <div className="absolute top-1 right-1 bg-green-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">START</div>
+                    )}
+                    <AutoFitText 
+                      text={item.displayLeft} 
+                      className={`font-bold ${s.text}`}
+                    />
+                  </div>
+                  <div className="flex-1 flex items-center justify-center">
+                    <AutoFitText text={item.displayRight} className={`font-bold ${s.text}`} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -954,14 +974,43 @@ const MatchingGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: G
     return mode === 'student' ? [...qCards, ...aCards].sort(() => Math.random() - 0.5) : [...qCards, ...aCards];
   }, [data, mode]);
 
+  // Split cards into pages (20 cards per page for A4 portrait)
+  const itemsPerPage = 20;
+  const pages = [];
+  for (let i = 0; i < cards.length; i += itemsPerPage) {
+    pages.push(cards.slice(i, i + itemsPerPage));
+  }
+
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {cards.map((card, i) => (
-        <div key={i} className={`aspect-square border-[1.5pt] rounded-2xl flex items-center justify-center p-4 text-center relative shadow-sm ${s.card} ${cutLineClass}`}>
-          <div className="absolute top-2 left-2 text-[8px] opacity-30 font-black uppercase">
-            {mode === 'answer' ? `${card.type}#${card.id + 1}` : `Thẻ #${i + 1}`}
+    <div className="space-y-10">
+      {pages.map((pageData, pageIndex) => (
+        <div key={pageIndex} className="game-page print:break-after-page min-h-[270mm] flex flex-col p-[15mm]">
+          <div className="mb-6 flex justify-between items-end border-b-2 border-slate-100 pb-4">
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Thẻ Ghép Đôi</h2>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                {mode === 'answer' ? 'Phiên bản dành cho Giáo viên' : 'Phiên bản dành cho Học sinh'} - Trang {pageIndex + 1}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
+              <div className="text-[8px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
+            </div>
           </div>
-          <AutoFitText text={card.text} className={`font-bold ${s.text}`} />
+          
+          <div className="grid grid-cols-4 gap-4 pt-4">
+            {pageData.map((card, i) => {
+              const globalIndex = pageIndex * itemsPerPage + i;
+              return (
+                <div key={globalIndex} className={`aspect-square border-[1.5pt] rounded-2xl flex items-center justify-center p-4 text-center relative shadow-sm ${s.card} ${cutLineClass}`}>
+                  <div className="absolute top-2 left-2 text-[8px] opacity-30 font-black uppercase">
+                    {mode === 'answer' ? `${card.type}#${card.id + 1}` : `Thẻ #${globalIndex + 1}`}
+                  </div>
+                  <AutoFitText text={card.text} className={`font-bold ${s.text}`} />
+                </div>
+              );
+            })}
+          </div>
         </div>
       ))}
     </div>
@@ -990,19 +1039,19 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: a
   return (
     <div className="space-y-6">
       {pages.map((pageData, pageIndex) => (
-        <div key={pageIndex} className="print:break-after-page min-h-[180mm] flex flex-col">
-          {pageIndex > 0 && (
-            <div className="mb-4 flex justify-between items-end border-b-2 border-slate-100 pb-2">
-              <div>
-                <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Domino Tam Giác</h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Trang {pageIndex + 1}</p>
-              </div>
-              <div className="text-right">
-                <div className="text-[9px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
-                <div className="text-[7px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
-              </div>
+        <div key={pageIndex} className="game-page print:break-after-page min-h-[180mm] flex flex-col p-[15mm]">
+          <div className="mb-4 flex justify-between items-end border-b-2 border-slate-100 pb-2">
+            <div>
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Domino Tam Giác</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                {mode === 'answer' ? 'Phiên bản dành cho Giáo viên' : 'Phiên bản dành cho Học sinh'} - Trang {pageIndex + 1}
+              </p>
             </div>
-          )}
+            <div className="text-right">
+              <div className="text-[9px] font-black text-slate-400 uppercase">Tác giả: Thầy Vũ Tiến Lực</div>
+              <div className="text-[7px] text-slate-400">Trường THPT Nguyễn Hữu Cảnh</div>
+            </div>
+          </div>
           
           <div className="flex flex-wrap pt-4 px-2 justify-center">
             {pageData.map((item, i) => {
