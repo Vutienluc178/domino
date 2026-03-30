@@ -11,6 +11,10 @@ import {
   BookOpen, 
   Plus, 
   Minus,
+  Flag,
+  Trophy,
+  Clock,
+  Zap,
   Trash2, 
   Download, 
   Printer, 
@@ -605,13 +609,64 @@ export default function App() {
               key="library"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="space-y-10"
             >
-              <LibraryCard 
-                title="Domino Tiếp Sức" 
-                desc="Học sinh ghép nối vế A của thẻ này với vế B của thẻ kia để tạo thành một chuỗi khép kín."
-                image="https://picsum.photos/seed/domino/400/250"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <LibraryCard 
+                  title="1. Học bài mới (Khám phá)" 
+                  desc="Phát bộ thẻ chứa các thuật ngữ và định nghĩa mới. HS tự nghiên cứu SGK để ghép nối, giúp ghi nhớ chủ động ngay từ đầu."
+                  image="https://picsum.photos/seed/learn/400/250"
+                />
+                <LibraryCard 
+                  title="2. Luyện tập (Giải toán/Lý/Hóa)" 
+                  desc="Ghép đề bài toán với kết quả cuối cùng. Phù hợp cho các bài tập trắc nghiệm ngắn, rèn luyện tốc độ tính toán."
+                  image="https://picsum.photos/seed/practice/400/250"
+                />
+                <LibraryCard 
+                  title="3. Củng cố (Cuối tiết)" 
+                  desc="Tóm tắt toàn bộ nội dung bài học bằng chuỗi Domino. Giúp HS hệ thống lại kiến thức một cách logic và trực quan."
+                  image="https://picsum.photos/seed/summary/400/250"
+                />
+                <LibraryCard 
+                  title="4. Tìm hiểu bài (Flipped Classroom)" 
+                  desc="Giao bộ thẻ về nhà hoặc đầu giờ. HS phải tìm hiểu trước tài liệu để có thể hoàn thành chuỗi Domino nhanh nhất."
+                  image="https://picsum.photos/seed/explore/400/250"
+                />
+                <LibraryCard 
+                  title="5. Kiểm tra bài cũ (Khởi động)" 
+                  desc="Thay vì gọi tên trả lời miệng, hãy cho cả lớp thi đấu ghép thẻ kiến thức cũ trong 5 phút đầu giờ để tạo hứng khởi."
+                  image="https://picsum.photos/seed/review/400/250"
+                />
+              </div>
+
+              <section className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+                <h2 className="text-2xl font-black mb-6 flex items-center gap-3 text-slate-800 uppercase tracking-tight">
+                  <Clock className="text-indigo-600" />
+                  Gợi ý số lượng & Thời gian
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <div className="text-indigo-600 font-black text-xl mb-1">10 Phút</div>
+                    <div className="text-slate-700 font-bold text-sm">5 - 8 Câu hỏi</div>
+                    <div className="text-slate-500 text-xs mt-1 italic">Mức độ: Nhận biết (Cơ bản)</div>
+                  </div>
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <div className="text-emerald-600 font-black text-xl mb-1">15 Phút</div>
+                    <div className="text-slate-700 font-bold text-sm">10 - 12 Câu hỏi</div>
+                    <div className="text-slate-500 text-xs mt-1 italic">Mức độ: Thông hiểu</div>
+                  </div>
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <div className="text-amber-600 font-black text-xl mb-1">30 Phút</div>
+                    <div className="text-slate-700 font-bold text-sm">15 - 20 Câu hỏi</div>
+                    <div className="text-slate-500 text-xs mt-1 italic">Mức độ: Vận dụng</div>
+                  </div>
+                  <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                    <div className="text-rose-600 font-black text-xl mb-1">45 Phút</div>
+                    <div className="text-slate-700 font-bold text-sm">25 - 30 Câu hỏi</div>
+                    <div className="text-slate-500 text-xs mt-1 italic">Mức độ: Tổng hợp / Nâng cao</div>
+                  </div>
+                </div>
+              </section>
             </motion.div>
           )}
 
@@ -637,7 +692,7 @@ export default function App() {
                   <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
                     <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center font-black mb-4">02</div>
                     <h3 className="font-bold mb-2">Luật chơi</h3>
-                    <p className="text-sm text-slate-500 leading-relaxed">HS tìm thẻ "BẮT ĐẦU". Sau đó tìm thẻ có vế trái khớp với vế phải của thẻ trước đó. Cứ thế cho đến khi khép kín.</p>
+                    <p className="text-sm text-slate-500 leading-relaxed">HS tìm thẻ có biểu tượng <span className="inline-flex items-center bg-indigo-600 text-white p-0.5 rounded-full mx-1"><Flag size={8} fill="white" /></span> (Bắt đầu). Sau đó tìm thẻ có vế trái khớp với vế phải của thẻ trước đó. Cứ thế cho đến khi khép kín.</p>
                   </div>
                   <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
                     <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center font-black mb-4">03</div>
@@ -923,7 +978,9 @@ const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any
                   <div className={`flex-1 flex items-center justify-center border-r-[1pt] relative ${s.left}`}>
                     {/* Start Indicator */}
                     {item.originalIndex === 0 && (
-                      <div className="absolute top-1 right-1 bg-green-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">START</div>
+                      <div className="absolute top-1 right-1 bg-indigo-600 text-white p-1 rounded-full shadow-lg animate-bounce">
+                        <Flag size={10} fill="white" />
+                      </div>
                     )}
                     <AutoFitText 
                       text={item.displayLeft} 
@@ -1110,7 +1167,9 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic', fontSize = 
                         <div className="absolute inset-0 pointer-events-none">
                           {/* Start Indicator */}
                           {item.originalIndex === 0 && (
-                            <div className={`absolute ${isDown ? 'bottom-6' : 'top-6'} left-1/2 -translate-x-1/2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black z-10`}>START</div>
+                            <div className={`absolute ${isDown ? 'bottom-6' : 'top-6'} left-1/2 -translate-x-1/2 bg-indigo-600 text-white p-1.5 rounded-full shadow-lg animate-bounce z-10`}>
+                              <Flag size={12} fill="white" />
+                            </div>
                           )}
 
                           {isDown ? (
