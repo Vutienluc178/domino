@@ -10,6 +10,7 @@ import {
   Library, 
   BookOpen, 
   Plus, 
+  Minus,
   Trash2, 
   Download, 
   Printer, 
@@ -40,6 +41,7 @@ export default function App() {
   const [data, setData] = useState<GameData[]>([{ q: '', a: '' }]);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'student' | 'answer'>('answer');
+  const [triangleFontSize, setTriangleFontSize] = useState<number>(16);
   
   // AI Prompt State
   const [promptInfo, setPromptInfo] = useState({
@@ -393,6 +395,27 @@ export default function App() {
                     </button>
                   </div>
 
+                  {gameType === 'triangle' && (
+                    <div className="flex items-center gap-3 bg-slate-100 p-1 rounded-2xl">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-2">Cỡ chữ:</span>
+                      <button 
+                        onClick={() => setTriangleFontSize(prev => Math.max(8, prev - 1))}
+                        className="p-2 bg-white text-indigo-600 rounded-xl shadow-sm hover:bg-indigo-50 transition-all"
+                        title="Giảm cỡ chữ"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="text-sm font-black text-indigo-600 w-8 text-center">{triangleFontSize}</span>
+                      <button 
+                        onClick={() => setTriangleFontSize(prev => Math.min(32, prev + 1))}
+                        className="p-2 bg-white text-indigo-600 rounded-xl shadow-sm hover:bg-indigo-50 transition-all"
+                        title="Tăng cỡ chữ"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3">
                     <button 
                       onClick={handlePrint}
@@ -420,7 +443,14 @@ export default function App() {
                     }`}
                     id="game-canvas"
                   >
-                    <GameRenderer type={gameType} data={data} mode={previewMode} bgImage={bgImage} theme={dominoTheme} />
+                    <GameRenderer 
+                      type={gameType} 
+                      data={data} 
+                      mode={previewMode} 
+                      bgImage={bgImage} 
+                      theme={dominoTheme} 
+                      triangleFontSize={triangleFontSize}
+                    />
                   </div>
                 </div>
               </div>
@@ -913,7 +943,7 @@ const DominoGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any
   );
 };
 
-function GameRenderer({ type, data, mode, bgImage, theme }: { type: GameType, data: GameData[], mode: 'student' | 'answer', bgImage: string | null, theme: DominoTheme }) {
+function GameRenderer({ type, data, mode, bgImage, theme, triangleFontSize }: { type: GameType, data: GameData[], mode: 'student' | 'answer', bgImage: string | null, theme: DominoTheme, triangleFontSize?: number }) {
   const shuffle = React.useCallback((array: any[]) => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -951,7 +981,7 @@ function GameRenderer({ type, data, mode, bgImage, theme }: { type: GameType, da
   }
 
   if (type === 'matching') return <MatchingGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} />;
-  if (type === 'triangle') return <TriangleGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} />;
+  if (type === 'triangle') return <TriangleGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} fontSize={triangleFontSize} />;
   return <DominoGame data={displayData} mode={mode} cutLineClass={cutLineClass} theme={theme} />;
 }
 
@@ -1020,7 +1050,7 @@ const MatchingGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: G
 /**
  * Triangle Domino Component
  */
-const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: any[], mode: string, cutLineClass: string, theme?: DominoTheme }) => {
+const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic', fontSize = 16 }: { data: any[], mode: string, cutLineClass: string, theme?: DominoTheme, fontSize?: number }) => {
   const themeStyles = {
     classic: { bg: "white", border: "#0f172a", text: "text-slate-900" },
     neon: { bg: "#0f172a", border: "#6366f1", text: "text-indigo-100" },
@@ -1029,8 +1059,8 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: a
   };
   const s = themeStyles[theme];
 
-  // Split data into pages (10 triangles per page as per example)
-  const itemsPerPage = 10;
+  // Split data into pages (8 triangles per page for maximum size)
+  const itemsPerPage = 8;
   const pages = [];
   for (let i = 0; i < data.length; i += itemsPerPage) {
     pages.push(data.slice(i, i + itemsPerPage));
@@ -1047,21 +1077,21 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: a
             </div>
           </div>
           
-          <div className="flex flex-col gap-12 pt-4">
+          <div className="flex flex-col gap-12 pt-10">
             {[0, 1].map(rowIndex => {
-              const rowData = pageData.slice(rowIndex * 5, (rowIndex + 1) * 5);
+              const rowData = pageData.slice(rowIndex * 4, (rowIndex + 1) * 4);
               if (rowData.length === 0) return null;
               
               return (
                 <div key={rowIndex} className="flex justify-center">
                   {rowData.map((item, i) => {
-                    const globalIndex = pageIndex * itemsPerPage + rowIndex * 5 + i;
+                    const globalIndex = pageIndex * itemsPerPage + rowIndex * 4 + i;
                     const isDown = i % 2 === 1;
                     
                     return (
                       <div 
                         key={globalIndex} 
-                        className={`relative w-[32%] aspect-[1.15/1] ${i > 0 ? '-ml-[16%]' : ''} ${cutLineClass}`}
+                        className={`relative w-[40%] aspect-[1.15/1] ${i > 0 ? '-ml-[20%]' : ''} ${cutLineClass}`}
                       >
                         <svg viewBox="0 0 100 86.6" className="w-full h-full drop-shadow-sm">
                           <polygon 
@@ -1086,38 +1116,38 @@ const TriangleGame = ({ data, mode, cutLineClass, theme = 'classic' }: { data: a
                           {isDown ? (
                             <>
                               {/* Top-Left side (A) - Parallel to side */}
-                              <div className="absolute top-[18%] left-[15%] w-[35%] h-[25%] rotate-[60deg] text-center flex items-center justify-center">
+                              <div className="absolute top-[18%] left-[15%] w-[35%] h-[30%] rotate-[60deg] text-center flex items-center justify-center">
                                 <AutoFitText 
                                   text={item.displayLeft} 
-                                  maxFontSize={16}
-                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                  maxFontSize={fontSize}
+                                  className={`font-bold leading-[1.1] ${s.text}`} 
                                 />
                               </div>
                               {/* Top-Right side (Q) - Parallel to side */}
-                              <div className="absolute top-[18%] right-[15%] w-[35%] h-[25%] -rotate-[60deg] text-center flex items-center justify-center">
+                              <div className="absolute top-[18%] right-[15%] w-[35%] h-[30%] -rotate-[60deg] text-center flex items-center justify-center">
                                 <AutoFitText 
                                   text={item.displayRight} 
-                                  maxFontSize={16}
-                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                  maxFontSize={fontSize}
+                                  className={`font-bold leading-[1.1] ${s.text}`} 
                                 />
                               </div>
                             </>
                           ) : (
                             <>
                               {/* Bottom-Left side (A) - Parallel to side */}
-                              <div className="absolute top-[42%] left-[15%] w-[35%] h-[25%] -rotate-[60deg] text-center flex items-center justify-center">
+                              <div className="absolute top-[42%] left-[15%] w-[35%] h-[30%] -rotate-[60deg] text-center flex items-center justify-center">
                                 <AutoFitText 
                                   text={item.displayLeft} 
-                                  maxFontSize={16}
-                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                  maxFontSize={fontSize}
+                                  className={`font-bold leading-[1.1] ${s.text}`} 
                                 />
                               </div>
                               {/* Bottom-Right side (Q) - Parallel to side */}
-                              <div className="absolute top-[42%] right-[15%] w-[35%] h-[25%] rotate-[60deg] text-center flex items-center justify-center">
+                              <div className="absolute top-[42%] right-[15%] w-[35%] h-[30%] rotate-[60deg] text-center flex items-center justify-center">
                                 <AutoFitText 
                                   text={item.displayRight} 
-                                  maxFontSize={16}
-                                  className={`font-bold leading-[1.2] ${s.text}`} 
+                                  maxFontSize={fontSize}
+                                  className={`font-bold leading-[1.1] ${s.text}`} 
                                 />
                               </div>
                             </>
